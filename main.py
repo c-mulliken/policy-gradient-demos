@@ -1,8 +1,9 @@
+from typing import Tuple, List
+
 import numpy as np
 import torch
 import torch.optim as optim
 import torch.nn as nn
-
 import gym
 
 from model import Policy
@@ -18,7 +19,22 @@ iterations = 200
 batch_size = 5000
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-def train():
+def train(
+        method: str = "naive",
+    ) -> Tuple[Policy, List[List[int]]]:
+    """
+    Train a policy using TRPO.
+    Args:
+        method (str): The method to use for training. Options are:
+            - "naive": Naive policy gradient.
+            - "reinforce": REINFORCE algorithm.
+            - "trpo": Trust Region Policy Optimization.
+            - "npg": Natural Policy Gradient.
+            - "ppo": Proximal Policy Optimization.
+    Returns:
+        policy (Policy): The trained policy.
+        total_durations (List[float]): 
+    """
     env = gym.make("CartPole-v1")
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
@@ -27,7 +43,12 @@ def train():
     old_policy = Policy(state_dim, action_dim).to(device)
     old_policy.load_state_dict(policy.state_dict())
 
+    total_durations = []
+
     for iteration in range(iterations):
+        # result trackers
+        durations = []
+
         states = []
         actions = []
         rewards = []
@@ -40,6 +61,7 @@ def train():
             state, _ = env.reset()
             episode_rewards = []
             done = False
+            duration = 0
             while not done:
                 action, log_prob = policy.get_action(state, device)
                 states.append(state)
@@ -52,7 +74,12 @@ def train():
                 
                 done = terminated or truncated
                 state = next_state
+                if not done:
+                    duration += 1
             rewards.append(episode_rewards)
+            durations.append(duration)
+        
+        total_durations.append(durations)
         
         # Flatten the rewards for advantage calculation.
         # Here we use the simple "return" as the advantage
@@ -83,19 +110,28 @@ def train():
         #
         # For this starter code, we simply perform a standard gradient ascent step.
         #
-        optimizer = optim.Adam(policy.parameters(), lr=1e-3)
-        optimizer.zero_grad()
-        # Note: maximizing the surrogate is equivalent to minimizing the negative surrogate.
-        (-surr_loss).backward()
-        optimizer.step()
-        #
-        # Update the old policy every iteration.
-        old_policy.load_state_dict(policy.state_dict())
-    
-    env.close()
-    return policy
 
-policy = train()
+        if method == "naive":
+            optimizer = optim.Adam(policy.parameters(), lr=1e-3)
+            optimizer.zero_grad()
+            # Note: maximizing the surrogate is equivalent to minimizing the negative surrogate.
+            (-surr_loss).backward()
+            optimizer.step()
+        elif method == "reinforce":
+            raise NotImplementedError("REINFORCE update not implemented in this starter code.")
+        elif method == "trpo":
+            raise NotImplementedError("TRPO update not implemented in this starter code.")
+        elif method == "npg":
+            raise NotImplementedError("NPG update not implemented in this starter code.")
+        elif method == "ppo":
+            raise NotImplementedError("PPO update not implemented in this starter code.")
+
+        old_policy.load_state_dict(policy.state_dict())
+
+    env.close()
+    return policy, total_durations
+
+policy = train(method='naive')
 
 # save policy
 policy_path = "policies/trpo_cartpole_policy.pth"

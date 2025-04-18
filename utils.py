@@ -10,13 +10,15 @@ def compute_returns(rewards, gamma):
         returns.insert(0, G)
     return returns
 
-def surrogate_loss(policy,
-                   old_policy,
-                   old_log_probs,
-                   states,
-                   actions,
-                   advantages,
-                   device = 'cuda' if torch.cuda.is_available() else 'cpu'):
+def surrogate_loss(
+        policy,
+        old_policy,
+        old_log_probs,
+        states,
+        actions,
+        advantages,
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    ):
     states_tensor = torch.FloatTensor(np.array(states)).to(device)
     actions_tensor = torch.LongTensor(actions).to(device)
     
