@@ -8,7 +8,8 @@ import gym
 import matplotlib.pyplot as plt
 
 from model import Policy
-from utils import compute_returns, surrogate_loss, flat_grad, flat_params, set_flat_params, kl_old_new, conjugate_gradient
+from utils import compute_returns, surrogate_loss, flat_grad, fisher_vector_product, conjugate_gradient, flat_params, set_flat_params
+from torch.distributions import Categorical
 from viz import viz_episode
 
 def train_one_epoch(
@@ -43,6 +44,7 @@ def train_one_epoch(
     total_timesteps = 0
 
     while total_timesteps < batch_size:
+        print(f"[DEBUG] Starting new episode. Total timesteps so far: {total_timesteps}")
         state, _ = env.reset()
         done = False
         episode_rewards = []
@@ -63,6 +65,7 @@ def train_one_epoch(
             if not done:
                 duration += 1
 
+        print(f"[DEBUG] Episode finished. Length: {duration}, Rewards: {sum(episode_rewards)}")
         rewards.append(episode_rewards)
         durations.append(duration)
 
@@ -73,6 +76,8 @@ def train_one_epoch(
     returns_tensor = torch.tensor(all_returns, dtype=torch.float32, device=device)
     advantages = returns_tensor - returns_tensor.mean()
 
+    print(f"[DEBUG] Calculated returns and advantages. Mean advantage: {advantages.mean().item():.4f}")
+
     surr_loss, mean_kl = surrogate_loss(
         policy,
         old_policy,
@@ -82,34 +87,58 @@ def train_one_epoch(
         advantages
     )
 
+    print(f"[DEBUG] Surrogate loss: {surr_loss.item():.6f}, Mean KL: {mean_kl.item():.6f}")
+
     if method == "naive":
+        print("[DEBUG] Using naive policy gradient update.")
         optimizer = optim.Adam(policy.parameters(), lr=1e-3)
         optimizer.zero_grad()
         (-surr_loss).backward()
         optimizer.step()
+    elif method == "trpo":
+        print("[DEBUG] Using TRPO update.")
+        states_tensor = torch.FloatTensor(np.array(states)).to(device)
+        actions_tensor = torch.LongTensor(actions).to(device)
+        old_log_probs_tensor = torch.FloatTensor(old_log_probs).to(device)
+        advantages_tensor = advantages.to(device)
 
-    elif method == "npg":
-        states_v = torch.as_tensor(
-            np.stack(states), dtype=torch.float32, device=device
+        surr_loss_trpo, _ = surrogate_loss(
+            policy, old_policy, old_log_probs, states, actions, advantages, device
         )
-        step_size = 0.01
-        damping = 0.01
+        policy.zero_grad()
+        grad = flat_grad(surr_loss_trpo, policy).detach()
+        print(f"[DEBUG] Policy gradient norm: {grad.norm().item():.6f}")
 
-        # 1) compute ∇J directly
-        loss_grad = flat_grad(surr_loss, policy).detach()   # ← note NO minus
+        def hvp_fn(v):
+            return fisher_vector_product(policy, old_policy, states_tensor, v)
 
-        # 2) solve F x = ∇J via CG, where F comes from KL(old||new)
-        def hvp(v):
-            # rebuild old_dist & new_dist inside here, see above
-            kl = kl_old_new(policy, old_policy, states_v)
-            grad_kl = flat_grad(kl, policy)
-            kl_v   = grad_kl.dot(v)
-            grad2_kl = flat_grad(kl_v, policy)
-            return grad2_kl + damping * v
+        step_dir = conjugate_gradient(hvp_fn, grad)
+        print(f"[DEBUG] Step direction norm: {step_dir.norm().item():.6f}")
 
-        x = conjugate_gradient(hvp, loss_grad)
-        new_params = flat_params(policy) + step_size * x
-        set_flat_params(policy, new_params)
+        max_kl = 1e-2
+        shs = 0.5 * step_dir.dot(hvp_fn(step_dir))
+        step_size = torch.sqrt(max_kl / (shs + 1e-8))
+        full_step = step_size * step_dir
+        print(f"[DEBUG] Step size: {step_size.item():.6f}")
+
+        from utils import flat_params, set_flat_params, surrogate_loss
+        old_params = flat_params(policy)
+        def set_and_eval(step):
+            set_flat_params(policy, old_params + step)
+            surr, kl = surrogate_loss(
+                policy, old_policy, old_log_probs, states, actions, advantages, device
+            )
+            return surr, kl
+
+        for frac in [0.5 ** i for i in range(10)]:
+            step = frac * full_step
+            surr, kl = set_and_eval(step)
+            print(f"[DEBUG] Line search frac: {frac:.5f}, KL: {kl.item():.6f}, Surrogate: {surr.item():.6f}")
+            if kl.item() <= max_kl and surr.item() > surr_loss_trpo.item():
+                break
+        else:
+            print("[DEBUG] Line search failed. Reverting policy parameters.")
+            set_flat_params(policy, old_params)
     else:
         raise ValueError(f"Unknown method: {method}")
 
