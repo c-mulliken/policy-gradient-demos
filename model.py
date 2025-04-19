@@ -23,3 +23,10 @@ class Policy(nn.Module):
         dist = Categorical(action_probs)
         action = dist.sample()
         return action.item(), dist.log_prob(action)
+    
+    def get_action_dist(self, state, device='cuda'):
+        if not torch.is_tensor(state):
+            state = torch.from_numpy(state).float().unsqueeze(0).to(device)
+        action_probs = self.forward(state)
+        dist = Categorical(action_probs)
+        return dist
