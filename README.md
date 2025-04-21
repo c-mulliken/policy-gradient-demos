@@ -1,2 +1,2 @@
-# trpo-demo
-Demonstrations of Trust Region Policy Optimization (TRPO)
+# policy-gradient-demos
+Demonstrations of policy gradient methods including REINFORCE and TRPO.
