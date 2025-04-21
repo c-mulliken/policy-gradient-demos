@@ -67,3 +67,11 @@ def surrogate_loss(policy, old_policy, old_log_probs, states, actions, advantage
     old_dist = Categorical(old_probs)
     kl_div = torch.distributions.kl_divergence(old_dist, dist)
     return surrogate, torch.mean(kl_div)
+
+def ema(data, alpha=0.2):
+    ema_data = []
+    v = data[0]
+    for x in data:
+        v = alpha * x + (1 - alpha) * v
+        ema_data.append(v)
+    return np.array(ema_data)

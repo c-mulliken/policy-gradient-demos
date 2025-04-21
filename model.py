@@ -3,11 +3,14 @@ import torch.nn as nn
 from torch.distributions import Categorical
 
 class Policy(nn.Module):
-    def __init__(self, state_dim, action_dim):
+    def __init__(self,
+                 state_dim: int,
+                 action_dim: int,
+                 hidden_neurons: int = 128):
         super(Policy, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 128)
-        self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, action_dim)
+        self.fc1 = nn.Linear(state_dim, hidden_neurons)
+        self.fc2 = nn.Linear(hidden_neurons, hidden_neurons)
+        self.fc3 = nn.Linear(hidden_neurons, action_dim)
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))
