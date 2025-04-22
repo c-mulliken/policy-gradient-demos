@@ -2,11 +2,22 @@ import numpy as np
 import torch
 from torch.distributions import Categorical
 
-def flat_grad(y, model):
+def flat_grad(
+        y: torch.Tensor, model: torch.nn.Module
+    ) -> torch.Tensor:
+    """
+    Compute the flat gradient of y with respect to the model parameters.
+    Args:
+        y (torch.Tensor): the output tensor
+        model (torch.nn.Module): the model whose parameters are to be differentiated
+    Returns:
+        torch.Tensor: the flattened gradient vector
+    """
+    
     grads = torch.autograd.grad(y, model.parameters(), create_graph=True)
     return torch.cat([g.contiguous().view(-1) for g in grads])
 
-def flat_params(model):
+def flat_params(model: torch.nn.Module) -> torch.Tensor:
     return torch.cat([p.data.view(-1) for p in model.parameters()])
 
 def set_flat_params(model, flat_vector):

@@ -34,7 +34,9 @@ def train_one_epoch(
         gamma (float): discount factor for returns
         method (str): training method, e.g. "naive"
         device (str): computation device, e.g. "cuda"
-
+        verbose (bool): whether to print debug information
+        max_kl (float): maximum KL divergence for TRPO
+        
     Returns:
         Tuple of surrogate loss, mean KL divergence, and list of episode durations
     """
@@ -169,6 +171,12 @@ def main_train(
         batch_size (int): timesteps per epoch
         gamma (float): discount factor
         device (str): computation device; auto-detected if None
+        verbose (bool): whether to print debug information
+        plot_result (bool): whether to plot the results
+        save_model (bool): whether to save the trained model
+        max_kl (float): maximum KL divergence for TRPO
+        hidden_neurons (int): number of neurons in the hidden layer
+        env_name (str): name of the environment to train on
 
     Returns:
         The trained policy and a list of duration lists for each epoch

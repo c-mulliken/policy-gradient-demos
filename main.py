@@ -1,10 +1,11 @@
+import time
 import matplotlib.pyplot as plt
 import numpy as np
 from train import main_train
 from utils import ema
-import time
+from viz import viz_episode
 
-EXPERIMENT_NAME = 'computational_cost'  # Change this to the desired experiment name
+EXPERIMENT_NAME = 'generate_gifs'  # Change this to the desired experiment name
 
 if EXPERIMENT_NAME == 'trpo_vs_reinforce_duration':
     trpo_model, trpo_results = main_train(method='trpo', max_kl=0.005, plot_result=False)
@@ -109,4 +110,9 @@ elif EXPERIMENT_NAME == "computational_cost":
     print("Standard deviation for TRPO KL = 0.01: ", np.std(times_trpo_highkl))
     print("Standard deviation for TRPO KL = 0.001: ", np.std(times_trpo_lowkl))
     print("Standard deviation for REINFORCE: ", np.std(times_reinforce))
+elif EXPERIMENT_NAME=="generate_gifs":
+    full_model, _ = main_train(method='trpo', max_kl=0.005, plot_result=False)
+    one_iter_model, _ = main_train(method='trpo', max_kl=0.005, plot_result=False, iterations=1)
+    viz_episode(full_model, env_name="CartPole-v1", filename="visualisations/gifs/full_model.gif", fps=30, mode="gif")
+    viz_episode(one_iter_model, env_name="CartPole-v1", filename="visualisations/gifs/one_iter_model.gif", fps=30, mode="gif")
 
